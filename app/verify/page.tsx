@@ -50,15 +50,22 @@ function VerifyContent() {
 
   // Check immediately if 'sid' is in URL
   useEffect(() => {
-    const urlSid = searchParams.get('sid');
-    if (urlSid) {
-      localStorage.setItem("oblivion_sid", urlSid);
-      checkKeyStatus(urlSid);
-    } else {
-      checkKeyStatus(); // Fallback to checking storage
-    }
-  }, [searchParams, checkKeyStatus]);
+  const urlSid = searchParams.get('sid');
+  if (urlSid) localStorage.setItem("oblivion_sid", urlSid);
 
+  // Initial check
+  checkKeyStatus();
+
+  // Polling: Check every 3 seconds if status is 'incomplete'
+  const interval = setInterval(() => {
+    if (status === "incomplete") {
+      console.log("Polling API for completion...");
+      checkKeyStatus();
+    }
+  }, 3000);
+
+  return () => clearInterval(interval);
+}, [searchParams, status, checkKeyStatus]);
   return (
     <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center font-sans text-white p-4">
       <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative">
