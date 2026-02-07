@@ -64,7 +64,7 @@ function GetKeyContent() {
   return (
     <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center text-white p-4">
       <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative overflow-hidden">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#8C5AFF] to-transparent" />
+        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#8C5AFF] to-transparent" />
         
         <h1 className="text-3xl font-black text-[#8C5AFF] italic mb-2">OBLIVION X</h1>
         <p className="text-gray-400 text-[10px] mb-8 uppercase tracking-widest">Security Portal</p>
