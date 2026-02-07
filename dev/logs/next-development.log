@@ -1,0 +1,9 @@
+[00:00:11.545] Server  LOG     ✓ Ready in 7.7s
+[00:00:14.648] Server  LOG     ○ Compiling / ...
+[00:00:19.102] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:00:24.083] Browser ERROR   API Error: {}
+[00:01:36.553] Server  WARN    ⚠ Fast Refresh had to perform a full reload when ./app/page.tsx changed. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+[00:01:36.574] Server  LOG     ✓ Compiled in 77ms
+[00:01:37.048] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+[00:02:04.129] Browser ERROR   Received non-JSON response from server.
+[00:03:28.780] Server  LOG     ✓ Compiled in 80ms
