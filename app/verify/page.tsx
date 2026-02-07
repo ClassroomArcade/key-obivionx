@@ -1,27 +1,24 @@
 "use client";
-import { useState, useEffect, Suspense, useCallback } from 'react';
+import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 function VerifyContent() {
   const [key, setKey] = useState("");
-  const [status, setStatus] = useState("loading"); // Start in loading to check URL immediately
+  const [status, setStatus] = useState("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const searchParams = useSearchParams();
+  const pollCount = useRef(0);
 
   const API_BASE = "https://api-kn3m.onrender.com/api/generate-key";
-  const AD_LINK = "https://link-center.net/1308535/W5CwvHlC6zla";
 
-  const checkKeyStatus = useCallback(async (incomingSid?: string) => {
-    // 1. Get SID from argument (URL) or LocalStorage
-    const sid = incomingSid || localStorage.getItem("oblivion_sid");
+  const checkKeyStatus = useCallback(async () => {
+    // Check URL first, then fall back to LocalStorage
+    const sid = searchParams.get('sid') || localStorage.getItem("oblivion_sid");
 
     if (!sid) {
       setStatus("no-session");
       return;
     }
-
-    setStatus("loading");
-    setErrorMsg("");
 
     try {
       const response = await fetch(API_BASE, {
@@ -32,101 +29,65 @@ function VerifyContent() {
 
       const data = await response.json();
 
-      if (response.status === 403) {
-        // API says ad not finished
-        setStatus("incomplete");
-        setErrorMsg(data.message || "Ad completion not detected yet.");
-      } else if (data.success) {
+      if (data.success) {
         setKey(data.key);
         setStatus("success");
       } else {
-        throw new Error(data.message || "Verification failed.");
+        setStatus("incomplete");
+        setErrorMsg(data.message || "Waiting for ad network signal...");
       }
-    } catch (err: any) {
+    } catch (err) {
       setStatus("error");
-      setErrorMsg(err.message);
+      setErrorMsg("Connection error. Retrying...");
     }
-  }, []);
+  }, [searchParams]);
 
-  // Check immediately if 'sid' is in URL
+  // AUTO-POLLING LOOP
   useEffect(() => {
-  const urlSid = searchParams.get('sid');
-  if (urlSid) localStorage.setItem("oblivion_sid", urlSid);
+    checkKeyStatus(); // Run immediately
 
-  // Initial check
-  checkKeyStatus();
+    const interval = setInterval(() => {
+      // Only poll if the ad isn't finished yet
+      setStatus((current) => {
+        if (current === "incomplete" || current === "loading") {
+          checkKeyStatus();
+        }
+        return current;
+      });
+    }, 4000); // Check every 4 seconds
 
-  // Polling: Check every 3 seconds if status is 'incomplete'
-  const interval = setInterval(() => {
-    if (status === "incomplete") {
-      console.log("Polling API for completion...");
-      checkKeyStatus();
-    }
-  }, 3000);
+    return () => clearInterval(interval);
+  }, [checkKeyStatus]);
 
-  return () => clearInterval(interval);
-}, [searchParams, status, checkKeyStatus]);
   return (
-    <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center font-sans text-white p-4">
+    <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center text-white p-4">
       <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#8C5AFF] to-transparent" />
-        
-        <h1 className="text-3xl font-black text-[#8C5AFF] italic mb-2">OBLIVION X</h1>
-        <p className="text-gray-400 text-[10px] mb-8 tracking-[0.3em] uppercase font-bold">Verification Center</p>
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#8C5AFF] to-transparent" />
+        <h1 className="text-3xl font-black text-[#8C5AFF] italic mb-6">VERIFICATION</h1>
 
-        {/* --- LOADING STATE --- */}
-        {status === "loading" && (
-          <div className="space-y-4 py-4">
-            <div className="w-12 h-12 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-sm text-gray-400 animate-pulse">Checking ad status...</p>
-          </div>
-        )}
+        {status === "loading" && <div className="animate-pulse text-gray-400">Initializing...</div>}
 
-        {/* --- INCOMPLETE / AD NOT FINISHED --- */}
         {status === "incomplete" && (
-          <div className="space-y-6">
-            <div className="bg-yellow-500/10 border border-yellow-500/20 p-4 rounded-xl">
-              <p className="text-yellow-500 text-sm font-medium">Ad Not Finished</p>
-              <p className="text-[10px] text-gray-400 mt-1">{errorMsg}</p>
-            </div>
-            <button 
-              onClick={() => checkKeyStatus()}
-              className="w-full bg-[#8C5AFF] py-4 rounded-xl font-bold shadow-lg hover:bg-[#7a49e6] transition-all"
-            >
-              RETRY VERIFICATION
-            </button>
-            <p className="text-[10px] text-gray-500 italic">
-              Note: It can take 10-30 seconds for the ad network to sync.
-            </p>
+          <div className="space-y-4">
+            <div className="w-10 h-10 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gray-400">Waiting for ad completion...</p>
+            <p className="text-[10px] text-gray-500 uppercase">Do not close this page</p>
           </div>
         )}
 
-        {/* --- SUCCESS STATE --- */}
         {status === "success" && (
-          <div className="space-y-4 animate-in fade-in zoom-in duration-500">
-            <div className="bg-[#1E2026] p-6 rounded-xl border-2 border-dashed border-[#8C5AFF]/40">
-              <p className="text-[10px] text-gray-500 uppercase mb-2">Your Access Key</p>
+          <div className="space-y-4 animate-in fade-in zoom-in">
+            <div className="bg-[#1E2026] p-6 rounded-xl border border-[#8C5AFF]/40">
               <code className="text-[#8C5AFF] text-xl font-mono block break-all select-all">{key}</code>
             </div>
-            <button 
-              onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }}
-              className="w-full py-3 bg-[#252830] rounded-lg text-[10px] font-bold tracking-widest hover:bg-[#2d313b] transition-colors"
-            >
-              COPY TO CLIPBOARD
-            </button>
+            <button onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} className="w-full py-3 bg-[#252830] rounded-lg text-[10px] font-bold tracking-widest">COPY KEY</button>
           </div>
         )}
 
-        {/* --- NO SESSION / ERROR --- */}
-        {(status === "no-session" || status === "error") && (
+        {status === "no-session" && (
           <div className="space-y-4">
-            <p className="text-red-400 text-xs">{errorMsg || "No active session found."}</p>
-            <button 
-              onClick={() => window.location.href = "/"}
-              className="w-full bg-[#2A2D36] py-4 rounded-xl font-bold"
-            >
-              GO TO MAIN PORTAL
-            </button>
+            <p className="text-red-400 text-xs">No session detected. Please restart.</p>
+            <button onClick={() => window.location.href = "/"} className="w-full bg-[#2A2D36] py-3 rounded-xl font-bold">GO BACK</button>
           </div>
         )}
       </div>
@@ -134,10 +95,6 @@ function VerifyContent() {
   );
 }
 
-export default function VerifyPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0F0F12] flex items-center justify-center text-white">Loading...</div>}>
-      <VerifyContent />
-    </Suspense>
-  );
+export default function Verify() {
+  return <Suspense><VerifyContent /></Suspense>;
 }
