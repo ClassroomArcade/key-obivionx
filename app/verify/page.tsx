@@ -1,17 +1,19 @@
 "use client";
-import { useState, useEffect, Suspense, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 
 function VerifyContent() {
   const [key, setKey] = useState("");
   const [status, setStatus] = useState("loading");
-  const searchParams = useSearchParams();
   const API_BASE = "https://api-kn3m.onrender.com/api/generate-key";
 
-  const checkStatus = useCallback(async (isManual = false) => {
-    const sid = searchParams.get('sid') || localStorage.getItem("oblivion_sid");
-    if (!sid) { setStatus("no-session"); return; }
-    if (isManual) setStatus("loading");
+  const checkStatus = useCallback(async () => {
+    // Look for the SID we saved on the first page
+    const sid = localStorage.getItem("oblivion_sid");
+
+    if (!sid) {
+      setStatus("no-session");
+      return false;
+    }
 
     try {
       const response = await fetch(API_BASE, {
@@ -31,57 +33,43 @@ function VerifyContent() {
     } catch (err) {
       return false;
     }
-  }, [searchParams]);
+  }, []);
 
   useEffect(() => {
-    checkStatus(); // Initial check
+    checkStatus();
     const interval = setInterval(async () => {
       if (status !== "success") {
         const finished = await checkStatus();
         if (finished) clearInterval(interval);
       }
-    }, 3000); // Poll every 3 seconds
+    }, 4000); // Check every 4 seconds
     return () => clearInterval(interval);
   }, [checkStatus, status]);
 
   return (
     <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center text-white p-4">
       <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#8C5AFF] to-transparent" />
-        <h1 className="text-2xl font-black text-[#8C5AFF] italic mb-6">VERIFICATION</h1>
+        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#8C5AFF] to-transparent" />
+        <h1 className="text-2xl font-black text-[#8C5AFF] italic mb-6 tracking-tighter">VERIFICATION</h1>
 
-        {status === "loading" ? (
-          <div className="space-y-6 py-4">
-            <div className="w-10 h-10 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-[10px] text-gray-500 uppercase tracking-widest animate-pulse">Checking ad completion...</p>
-          </div>
-        ) : status === "incomplete" ? (
+        {status === "loading" || status === "incomplete" ? (
           <div className="space-y-6">
-            <div className="p-4 bg-[#8C5AFF]/10 border border-[#8C5AFF]/20 rounded-xl">
-               <p className="text-[#8C5AFF] text-xs font-bold">WAITING FOR AD SIGNAL</p>
-            </div>
-            <button onClick={() => checkStatus(true)} className="w-full py-4 bg-[#2A2D36] hover:bg-[#353945] rounded-xl text-[10px] font-bold tracking-widest transition-all">
-              FORCE RE-CHECK
-            </button>
+            <div className="w-10 h-10 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-xs text-gray-400 uppercase tracking-widest">Awaiting Ad Completion...</p>
           </div>
         ) : status === "success" ? (
           <div className="space-y-4 animate-in fade-in zoom-in duration-500">
             <div className="bg-[#1E2026] p-6 rounded-xl border border-[#8C5AFF]/40">
-              <p className="text-[10px] text-gray-500 uppercase mb-2 font-bold tracking-tighter">Your Key</p>
-              <code className="text-[#8C5AFF] text-xl font-mono block break-all select-all">{key}</code>
+              <code className="text-[#8C5AFF] text-xl font-mono block break-all">{key}</code>
             </div>
-            <button onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} className="w-full py-4 bg-[#8C5AFF] rounded-xl text-xs font-bold tracking-widest">
-              COPY TO CLIPBOARD
-            </button>
+            <button onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} className="w-full py-4 bg-[#8C5AFF] rounded-xl font-bold">COPY KEY</button>
           </div>
         ) : (
-          <p className="text-red-500 text-xs font-bold">SESSION NOT FOUND</p>
+          <div className="text-red-500 text-xs font-bold">SESSION EXPIRED. RESTART FROM MAIN PAGE.</div>
         )}
       </div>
     </div>
   );
 }
 
-export default function Verify() {
-  return <Suspense><VerifyContent /></Suspense>;
-}
+export default function Verify() { return <Suspense><VerifyContent /></Suspense>; }
