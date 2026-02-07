@@ -11,8 +11,8 @@ function GetKeyContent() {
 
   // --- CONFIGURATION ---
   const API_BASE = "https://api-kn3m.onrender.com";
-  const MY_SITE_URL = "https://your-site.netlify.app/verify"; 
-  const AD_SHORTENER_URL = "https://link-to-your-shortener.com/?url=";
+  const MY_SITE_URL = "https://oblivionxkey.netlify.app/verify"; 
+  const AD_SHORTENER_URL = "https://link-center.net/1308535/W5CwvHlC6zla";
 
   useEffect(() => {
     const checkServer = async () => {
