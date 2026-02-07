@@ -1,18 +1,16 @@
 "use client";
-import { useState, useEffect, Suspense, useCallback, useRef } from 'react';
+import { useState, useEffect, Suspense, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
 
 function VerifyContent() {
   const [key, setKey] = useState("");
   const [status, setStatus] = useState("loading");
-  const [errorMsg, setErrorMsg] = useState("");
   const searchParams = useSearchParams();
-  const pollCount = useRef(0);
 
   const API_BASE = "https://api-kn3m.onrender.com/api/generate-key";
 
   const checkKeyStatus = useCallback(async () => {
-    // Check URL first, then fall back to LocalStorage
+    // Get SID from URL or fallback to LocalStorage
     const sid = searchParams.get('sid') || localStorage.getItem("oblivion_sid");
 
     if (!sid) {
@@ -29,65 +27,74 @@ function VerifyContent() {
 
       const data = await response.json();
 
-      if (data.success) {
+      // KEY FIX: If success is true, update state immediately
+      if (data.success && data.key) {
         setKey(data.key);
         setStatus("success");
-      } else {
-        setStatus("incomplete");
-        setErrorMsg(data.message || "Waiting for ad network signal...");
-      }
+        return true; // Stop polling
+      } 
+      
+      setStatus("incomplete");
+      return false;
     } catch (err) {
-      setStatus("error");
-      setErrorMsg("Connection error. Retrying...");
+      console.error("Fetch error:", err);
+      return false;
     }
   }, [searchParams]);
 
-  // AUTO-POLLING LOOP
   useEffect(() => {
-    checkKeyStatus(); // Run immediately
+    // Run the check immediately on mount
+    checkKeyStatus();
 
-    const interval = setInterval(() => {
-      // Only poll if the ad isn't finished yet
-      setStatus((current) => {
-        if (current === "incomplete" || current === "loading") {
-          checkKeyStatus();
-        }
-        return current;
-      });
-    }, 4000); // Check every 4 seconds
+    // Set up a fast interval to catch the postback signal
+    const interval = setInterval(async () => {
+      // Only keep checking if we haven't succeeded yet
+      if (status !== "success") {
+        const found = await checkKeyStatus();
+        if (found) clearInterval(interval);
+      }
+    }, 2000); // Check every 2 seconds for a faster response
 
     return () => clearInterval(interval);
-  }, [checkKeyStatus]);
+  }, [checkKeyStatus, status]);
 
   return (
     <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center text-white p-4">
       <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative">
-        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#8C5AFF] to-transparent" />
-        <h1 className="text-3xl font-black text-[#8C5AFF] italic mb-6">VERIFICATION</h1>
+        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#8C5AFF] to-transparent" />
+        <h1 className="text-3xl font-black text-[#8C5AFF] italic mb-6">VERIFYING</h1>
 
-        {status === "loading" && <div className="animate-pulse text-gray-400">Initializing...</div>}
-
-        {status === "incomplete" && (
-          <div className="space-y-4">
-            <div className="w-10 h-10 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-            <p className="text-sm text-gray-400">Waiting for ad completion...</p>
-            <p className="text-[10px] text-gray-500 uppercase">Do not close this page</p>
-          </div>
-        )}
-
-        {status === "success" && (
-          <div className="space-y-4 animate-in fade-in zoom-in">
-            <div className="bg-[#1E2026] p-6 rounded-xl border border-[#8C5AFF]/40">
-              <code className="text-[#8C5AFF] text-xl font-mono block break-all select-all">{key}</code>
+        {status === "loading" || status === "incomplete" ? (
+          <div className="space-y-6">
+            <div className="w-12 h-12 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="space-y-2">
+              <p className="text-sm font-bold text-gray-300">WAITING FOR AD COMPLETION...</p>
+              <p className="text-[10px] text-gray-500 uppercase tracking-widest">The key will appear here automatically</p>
             </div>
-            <button onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} className="w-full py-3 bg-[#252830] rounded-lg text-[10px] font-bold tracking-widest">COPY KEY</button>
+            <button 
+              onClick={() => checkKeyStatus()} 
+              className="text-[10px] text-[#8C5AFF] hover:underline"
+            >
+              Click here if it takes too long
+            </button>
           </div>
-        )}
-
-        {status === "no-session" && (
+        ) : status === "success" ? (
+          <div className="space-y-4 animate-in fade-in zoom-in duration-500">
+            <div className="bg-[#1E2026] p-6 rounded-xl border border-[#8C5AFF]/40 shadow-[0_0_15px_rgba(140,90,255,0.1)]">
+              <p className="text-[10px] text-gray-500 uppercase mb-2 font-bold tracking-tighter">Access Key Generated</p>
+              <code className="text-[#8C5AFF] text-2xl font-mono block break-all select-all">{key}</code>
+            </div>
+            <button 
+              onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} 
+              className="w-full py-4 bg-[#8C5AFF] hover:bg-[#7a49e6] rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
+            >
+              COPY TO CLIPBOARD
+            </button>
+          </div>
+        ) : (
           <div className="space-y-4">
-            <p className="text-red-400 text-xs">No session detected. Please restart.</p>
-            <button onClick={() => window.location.href = "/"} className="w-full bg-[#2A2D36] py-3 rounded-xl font-bold">GO BACK</button>
+            <p className="text-red-400 text-xs font-bold uppercase">No Active Session</p>
+            <button onClick={() => window.location.href = "/"} className="w-full bg-[#2A2D36] py-3 rounded-xl font-bold">RESTART PORTAL</button>
           </div>
         )}
       </div>
