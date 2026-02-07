@@ -9,14 +9,16 @@ function VerifyContent() {
 
   const API_BASE = "https://api-kn3m.onrender.com/api/generate-key";
 
-  const checkKeyStatus = useCallback(async () => {
-    // Get SID from URL or fallback to LocalStorage
+  const checkKeyStatus = useCallback(async (isManual = false) => {
     const sid = searchParams.get('sid') || localStorage.getItem("oblivion_sid");
 
     if (!sid) {
       setStatus("no-session");
-      return;
+      return false;
     }
+
+    // If the user clicks manually, show the spinner again
+    if (isManual) setStatus("loading");
 
     try {
       const response = await fetch(API_BASE, {
@@ -27,33 +29,30 @@ function VerifyContent() {
 
       const data = await response.json();
 
-      // KEY FIX: If success is true, update state immediately
       if (data.success && data.key) {
         setKey(data.key);
         setStatus("success");
-        return true; // Stop polling
+        return true;
       } 
       
       setStatus("incomplete");
       return false;
     } catch (err) {
       console.error("Fetch error:", err);
+      setStatus("incomplete");
       return false;
     }
   }, [searchParams]);
 
   useEffect(() => {
-    // Run the check immediately on mount
     checkKeyStatus();
 
-    // Set up a fast interval to catch the postback signal
     const interval = setInterval(async () => {
-      // Only keep checking if we haven't succeeded yet
       if (status !== "success") {
         const found = await checkKeyStatus();
         if (found) clearInterval(interval);
       }
-    }, 2000); // Check every 2 seconds for a faster response
+    }, 3000); // Polling every 3 seconds
 
     return () => clearInterval(interval);
   }, [checkKeyStatus, status]);
@@ -64,37 +63,41 @@ function VerifyContent() {
         <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#8C5AFF] to-transparent" />
         <h1 className="text-3xl font-black text-[#8C5AFF] italic mb-6">VERIFYING</h1>
 
-        {status === "loading" || status === "incomplete" ? (
+        {status === "loading" ? (
           <div className="space-y-6">
             <div className="w-12 h-12 border-4 border-[#8C5AFF] border-t-transparent rounded-full animate-spin mx-auto" />
-            <div className="space-y-2">
-              <p className="text-sm font-bold text-gray-300">WAITING FOR AD COMPLETION...</p>
-              <p className="text-[10px] text-gray-500 uppercase tracking-widest">The key will appear here automatically</p>
+            <p className="text-sm font-bold text-gray-300 animate-pulse">CHECKING SERVER...</p>
+          </div>
+        ) : status === "incomplete" ? (
+          <div className="space-y-6">
+            <div className="p-4 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+               <p className="text-yellow-500 text-xs font-bold">AWAITING AD SIGNAL</p>
             </div>
             <button 
-              onClick={() => checkKeyStatus()} 
-              className="text-[10px] text-[#8C5AFF] hover:underline"
+              onClick={() => checkKeyStatus(true)} 
+              className="w-full py-4 bg-[#8C5AFF] hover:bg-[#7a49e6] rounded-xl text-xs font-bold transition-all shadow-lg shadow-[#8C5AFF]/10"
             >
-              Click here if it takes too long
+              FORCE RE-CHECK NOW
             </button>
+            <p className="text-[10px] text-gray-500">The ad network can take up to 60 seconds to sync.</p>
           </div>
         ) : status === "success" ? (
           <div className="space-y-4 animate-in fade-in zoom-in duration-500">
-            <div className="bg-[#1E2026] p-6 rounded-xl border border-[#8C5AFF]/40 shadow-[0_0_15px_rgba(140,90,255,0.1)]">
-              <p className="text-[10px] text-gray-500 uppercase mb-2 font-bold tracking-tighter">Access Key Generated</p>
+            <div className="bg-[#1E2026] p-6 rounded-xl border border-[#8C5AFF]/40">
+              <p className="text-[10px] text-gray-500 uppercase mb-2 font-bold">Access Key</p>
               <code className="text-[#8C5AFF] text-2xl font-mono block break-all select-all">{key}</code>
             </div>
             <button 
               onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} 
-              className="w-full py-4 bg-[#8C5AFF] hover:bg-[#7a49e6] rounded-xl text-xs font-bold tracking-widest transition-all active:scale-95"
+              className="w-full py-4 bg-[#8C5AFF] rounded-xl text-xs font-bold transition-all"
             >
               COPY TO CLIPBOARD
             </button>
           </div>
         ) : (
           <div className="space-y-4">
-            <p className="text-red-400 text-xs font-bold uppercase">No Active Session</p>
-            <button onClick={() => window.location.href = "/"} className="w-full bg-[#2A2D36] py-3 rounded-xl font-bold">RESTART PORTAL</button>
+            <p className="text-red-400 text-xs">NO SESSION FOUND</p>
+            <button onClick={() => window.location.href = "/"} className="w-full bg-[#2A2D36] py-3 rounded-xl font-bold">RESTART</button>
           </div>
         )}
       </div>
