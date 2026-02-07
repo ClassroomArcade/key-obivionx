@@ -9,22 +9,22 @@ function GetKeyContent() {
   const [expiry, setExpiry] = useState<string | null>(null);
   const searchParams = useSearchParams();
 
-  // CONFIGURATION
+  // --- CONFIGURATION ---
   const API_BASE = "https://api-kn3m.onrender.com";
-  const AD_LINK = "https://link-to-your-shortener.com/?url=https://your-site.netlify.app/verify?sid=";
+  const MY_SITE_URL = "https://your-site.netlify.app/verify"; 
+  const AD_SHORTENER_URL = "https://link-to-your-shortener.com/?url=";
 
-  // 1. Monitor Server Health & Load SID
   useEffect(() => {
     const checkServer = async () => {
       try {
         const res = await fetch(`${API_BASE}/`);
-        if (res.ok) setServerOnline("online");
-        else setServerOnline("sleeping");
+        setServerOnline(res.ok ? "online" : "sleeping");
       } catch {
         setServerOnline("sleeping");
       }
     };
 
+    // Grab SID from URL if returning from an ad
     const urlSid = searchParams.get('sid');
     if (urlSid) localStorage.setItem("oblivion_sid", urlSid);
 
@@ -35,7 +35,6 @@ function GetKeyContent() {
     return () => clearInterval(interval);
   }, [searchParams]);
 
-  // 2. Check if user already has a valid key
   const checkExistingKey = async () => {
     const sid = localStorage.getItem("oblivion_sid");
     if (!sid) return;
@@ -47,16 +46,14 @@ function GetKeyContent() {
         body: JSON.stringify({ sessionId: sid })
       });
       const data = await response.json();
-
       if (data.hasKey && !data.expired) {
         setKey(data.key);
         setStatus("success");
         setExpiry(`${data.expiresIn}h remaining`);
       }
-    } catch (e) { console.log("No existing session found."); }
+    } catch (e) { console.log("Session check failed."); }
   };
 
-  // 3. The Main Logic
   const handleAction = async () => {
     let sid = localStorage.getItem("oblivion_sid");
     if (!sid) {
@@ -73,17 +70,17 @@ function GetKeyContent() {
         body: JSON.stringify({ sessionId: sid, system: "standard" })
       });
 
-      // Handle HTML error pages from Render spin-up
       const contentType = response.headers.get("content-type");
       if (!contentType?.includes("application/json")) {
-        throw new Error("Server is still waking up. Please wait 10 seconds and try again.");
+        throw new Error("API is waking up. Please try again in 10 seconds.");
       }
 
       const data = await response.json();
 
       if (response.status === 403) {
-        // User needs to go through Linkvertise
-        window.location.href = AD_LINK + sid;
+        // DYNAMIC LINK: Construct the verify URL + SID, then encode it for the shortener
+        const verifyUrl = `${MY_SITE_URL}?sid=${sid}`;
+        window.location.href = `${AD_SHORTENER_URL}${encodeURIComponent(verifyUrl)}`;
         return;
       }
 
@@ -100,73 +97,43 @@ function GetKeyContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center font-sans text-white p-4">
-      <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative overflow-hidden">
-        
-        {/* Decorative Top Glow */}
-        <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-transparent via-[#8C5AFF] to-transparent" />
-
-        {/* Server Status Indicator */}
+    <div className="min-h-screen bg-[#0F0F12] flex items-center justify-center text-white p-4">
+      <div className="bg-[#17191C] border border-[#2A2D36] p-8 rounded-2xl w-full max-w-md text-center shadow-2xl relative">
         <div className="absolute top-4 right-4 flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${
-            serverOnline === "online" ? "bg-green-500 shadow-[0_0_8px_#22c55e]" : 
-            serverOnline === "sleeping" ? "bg-yellow-500 animate-pulse" : "bg-gray-500"
-          }`} />
-          <span className="text-[10px] text-gray-500 font-bold uppercase tracking-tighter">
+          <div className={`w-2 h-2 rounded-full ${serverOnline === "online" ? "bg-green-500" : "bg-yellow-500 animate-pulse"}`} />
+          <span className="text-[10px] text-gray-500 font-bold uppercase">
             {serverOnline === "online" ? "API Online" : "API Waking Up"}
           </span>
         </div>
 
-        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-linear-to-b from-[#A066FF] to-[#6A1BFF] mb-2 italic tracking-tighter">
-          OBLIVION X
-        </h1>
-        <p className="text-gray-500 text-xs uppercase tracking-[0.3em] mb-8 font-semibold">User Authentication</p>
-
+        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-linear-to-b from-[#A066FF] to-[#6A1BFF] mb-2 italic">OBLIVION X</h1>
+        
         {status !== "success" ? (
-          <div className="space-y-4">
-            <div className="bg-[#1E2026] p-4 rounded-lg border border-[#2A2D36] text-sm text-gray-400">
-              Access is currently restricted. Please generate a temporary session key to continue.
-            </div>
+          <div className="space-y-4 mt-8">
             <button 
               onClick={handleAction}
               disabled={status === "loading" || serverOnline === "checking"}
-              className="w-full bg-[#8C5AFF] hover:bg-[#7a49e6] py-4 rounded-xl font-bold transition-all disabled:opacity-50 shadow-lg shadow-[#8C5AFF]/20 transform active:scale-95"
+              className="w-full bg-[#8C5AFF] py-4 rounded-xl font-bold transition-all disabled:opacity-50"
             >
               {status === "loading" ? "PROCESSING..." : "GET ACCESS KEY"}
             </button>
           </div>
         ) : (
-          <div className="space-y-4 animate-in fade-in zoom-in duration-500">
-            <div className="bg-[#1E2026] p-6 rounded-xl border-2 border-dashed border-[#8C5AFF]/30 relative">
-              <p className="text-[10px] text-gray-500 uppercase font-bold mb-2 tracking-widest">Your Key</p>
-              <code className="text-[#8C5AFF] text-xl font-mono tracking-widest block break-all">{key}</code>
+          <div className="space-y-4 mt-8 animate-in fade-in zoom-in">
+            <div className="bg-[#1E2026] p-6 rounded-xl border-2 border-dashed border-[#8C5AFF]/30">
+              <code className="text-[#8C5AFF] text-xl font-mono block break-all">{key}</code>
             </div>
-            {expiry && (
-              <p className="text-[10px] text-green-500 font-bold uppercase tracking-widest">
-                Status: Verified • {expiry}
-              </p>
-            )}
-            <button 
-              onClick={() => { navigator.clipboard.writeText(key); alert("Copied to clipboard!"); }}
-              className="w-full py-3 bg-[#252830] hover:bg-[#2d313b] border border-[#3a3f4b] rounded-lg text-xs font-semibold transition-colors"
-            >
-              COPY TO CLIPBOARD
-            </button>
+            <button onClick={() => { navigator.clipboard.writeText(key); alert("Copied!"); }} className="w-full py-3 bg-[#252830] rounded-lg text-xs">COPY KEY</button>
           </div>
         )}
-
-        <p className="mt-8 text-[10px] text-gray-600">
-          Keys are bound to your HWID and expire after 24 hours.
-        </p>
       </div>
     </div>
   );
 }
 
-// Wrap in Suspense to prevent build errors with searchParams
 export default function GetKey() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-[#0F0F12] text-white flex items-center justify-center font-mono uppercase tracking-widest">Loading Oblivion...</div>}>
+    <Suspense fallback={<div className="min-h-screen bg-[#0F0F12] text-white flex items-center justify-center">Loading...</div>}>
       <GetKeyContent />
     </Suspense>
   );
